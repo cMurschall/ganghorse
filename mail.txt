@@ -1,0 +1,118 @@
+Hallo Lena,
+es hat mich sehr gefreut, dich am Kronshof-Special kennengelernt zu haben. Schade, dass wir uns nicht eher über den Weg gelaufen sind, wir hätten ganz sicher eine zimlich coole und erfolgreiche Seite zusammen erarbeiten können.
+
+Anbei gebe ich dir mal nochmal ein paar Infos zu gang.horse und den Code, den ich geschrieben hab. Wie schon gesagt, ich hab das nich allzu ernst genommen und das ist das Ergebniss von einem Weihnachtsurlaub und ein paar freien Nachmittagen und Wochenenden. Das bedeutet, dass mein Code ziemlich zusammengeschustert ist.
+
+
+Das Backend von gang.horse ist ein, in TypeScript geschriebener Nodeserver, das Frontend ist mit Vue geschrieben worden und als Framework habe ich aus ganz vielen Gründen Quasar (https://quasar.dev/) genommen. Warum beschreibe ich später immer mal wieder.
+
+Als Datenbank nutze ich eine Postgres-Datenbank und als Cachinglayer redis. Alles wird in docker gehosted und als webserver / reverse proxy nutze ich nginx.
+
+
+
+Ein paar Features würde ich etwas näher beschreiben wollen.
+
+- Restrektion von kompromitierten Passwörtern
+Es dem Nutzer nicht möglich ein Passwort wie "123456" zu wählen. Der australische Sicherheitsforscher Troy Hunt verwaltet eine Liste von Passwörtern, die geleaked worden sind. Diese sollten nicht mehr verwendet werden. Um herauszufinden, ob das gewählte Passwort schon geleaked ist und unsicher ist ohne die Sicherheit der Nutzer zu gefährden, hat er hier: https://www.troyhunt.com/ive-just-launched-pwned-passwords-version-2/#cloudflareprivacyandkanonymity ein Verfahren vorgestellt, dass Ganghorse auch nutzt.
+Den Code dafür findest du unter src\components\RegisterForm.vue
+
+-Erstellen einer Anzeite mit vorausgefüllten Pferdewerten
+
+Wie schon demonstriert hole ich mir Daten aus dem worldfengur.
+Dazu hatte ich drei Datenquellen identifiziert, die ich dafür anzapfen wollte. Den Code findest du unter backend\src\Helpers\HorseData\
+
+    + Die Worldfengur seite an sich. Das ist allerdings nicht so ganz easy. Man muss mit ganz bestimmten headern da ran gehen, sich authentifizieren und dann die Suchseite mit den Pferde parsen. Sehr aufwändig und ich hab davon Abstand gehalten.
+    + Sporti.dk. Das ging mit z.B. so einer URL: https://www.sporti.dk/en/ajax/feif.php?feifid=DE2011222883 . Das ist seit Corona leider nicht mehr aktiv. Du hattest aber gesagt, dass das immer noch irgendwie möglich sei, vielleicht ist die url nur umgezogen.
+    + Die Anitar App. Ich hab den Traffic der App über einen Proxy laufen lassen und rausgefunden, dass die App den folgenden Endpoint nutzt: https://anitar.herokuapp.com/api/horse/?feifId=DE2011222883 . Den nutzt auch gang.horse kackfrech einfach mit. 
+
+
+- Umkreissuche
+Unter buildDb\index.js findest du ein Script, dass die Postleitzahlen, Name und Geolocation (Länge und Breitengrad) von praktisch allen ländern der Welt downloaden kann und in die Postges Datenbank kopiert. Die Daten selber kommen von http://download.geonames.org/export/zip
+Postgres hat eine sehr angnehm zu nutzende Erweiterung PostGIS, die die Geoberechnung übernimmt. (Suche im Backendcode nach ST_DWithin oder ST_SetSRID).
+Im Frontend nutze ich ganz normale geojson datein + d3.js um die Punkte darzustellen. Die geojson datein, die ich nutze findest du unter frontend\src\helpers\maps
+Die geojson datein hab ich auf Github gefunden, diese aber zimlich stark nochmal vereinfacht. Ich weiß allersings nicht mehr genau, welchen simplyfier ich genutzt hab.
+
+
+
+- Währungen
+Der Nutzer kann ja die Währung des Pferde auswählen. (in Euro, Franken, dänischen und schwedischen Kronen). Um dann eine Suche in anderen Währungen zu ermöglichen holt sich das Backend ab und zu die aktuellen Umrechnugnskurse. (Das hat am Kronshof nicht geklappt, weil der Anbieter die API geändert hatte, das hab ich heute aber repariert und auf gang.horse kannst du dir das jetzt einmal anschauen. Den code wie ich die Umrechnugnskurse abhole und die eine Währung in die andere konvertiere kannst du unter backend\src\Helpers\CurencyConverter.ts anschauen.
+Die entsprechende Datenbankabfrage der Anzeite ist unter backend\src\Controllers\HorseController.ts zu finden.
+
+
+
+- Liste der Pferdefarben:
+Dunkelbrauner,
+Braunschecke,
+Braunfalbe,
+Erdfarben,
+Perlino,
+
+
+Rappe,
+Rappschecke,
+Graufalbe,
+Leuchtrappe,
+SmokeyCream,
+
+
+Fuchs,
+Dunkelfuchs,
+Rotfuchs,
+Fuchsschecke,
+Rotfalbe,
+Isabell,
+Cremello,
+
+
+Schimmel,
+Grauschimmel,
+Schimmelschecke,
+
+Rappwindfarben,
+Braunwindfarben,
+Windfarbschecke,
+
+Helmschecke,
+
+Farbwechsler,
+Farbwechslerschecke,
+
+ScheckeAndere,
+
+
+
+- Ach ja, warum nutze ich Quasar?
+Ich wollte, dass die Anzeigen von Facebook, Whatsapp, Twitter etc gut gerendert werden. Leider funktioniert das für in Javascript geschriebene Seiten nicht. Quasar kann die Seite aber auch sehr leicht serverseitig rendern. Das passiert, wenn Facebook etc versucht die Seite abzufragen.
+nginx detectiert das und leidtet die Anfrage zu einem anderen Dockercontainer. 
+Das fand ich recht interessant und ist unter \nginx\nginx.conf zu finden:
+
+location / {
+	# proxy_cache frontend_cache;
+	expires 30d;
+	proxy_set_header X-Real-IP $remote_addr;
+	if ($http_user_agent ~* "googlebot|bingbot|yandex|baiduspider|twitterbot|facebookexternalhit|rogerbot|linkedinbot|embedly|quora link preview|showyoubot|outbrain|pinterest\/0\.|pinterestbot|slackbot|vkShare|W3C_Validator|whatsapp") {   
+		proxy_pass http://prerender:3001;
+		break;
+	}
+	proxy_pass  http://frontend:3100;
+}
+
+
+
+Ich hoffe, ich hab nicht allzu interessantes vergessen, falls ja - bitte zöger nicht mich anzuschreiben.
+
+
+Viele Grüße und wir sehen und bestimmt auf dem einen oder anderen Turnier
+
+Christian
+
+
+
+
+-- 
+Christian Murschall
+Ostpreußenweg 2
+24257 Hohenfelde
+
+christian@murschall.net
+0160/95149679    Brauner,

@@ -1,0 +1,24 @@
+// app global css in Scss form
+
+
+@font-face {
+    font-family: logoFont;
+    src: url(./fonts/highSummit.woff2);
+}
+
+// declare a class which applies it
+.logoFont {
+    font-family: 'logoFont';
+}
+
+
+
+$gangHorseBlue : rgb(96, 134, 161);
+
+.text-gangHorseBlue {
+    color: $gangHorseBlue;
+}
+
+.bg-gangHorseBlue {
+    background: $gangHorseBlue;
+}

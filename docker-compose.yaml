@@ -1,0 +1,153 @@
+version: '3.5'
+
+services:
+  redis:
+    container_name: redis_container
+    image: redis
+    restart: unless-stopped
+    # ports:
+    #   - "127.0.0.1:6379:6379"
+    networks:
+      - iceHorseNet
+  redisCommander:
+    container_name: redis_commander
+    image: rediscommander/redis-commander:latest
+    # ports:
+    #   - "127.0.0.1:8081:8081"
+    restart: unless-stopped
+    environment:
+     - REDIS_HOSTS=local:redis:6379
+    networks:
+      - iceHorseNet      
+
+
+  postgres:
+    container_name: postgres_container
+    image: mdillon/postgis
+    restart: unless-stopped
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /data/postgres
+      POSTGRES_DB: iceHorseFair
+    volumes:
+       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+       - postgres:/data/postgres
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+    networks:
+      - iceHorseNet
+  
+  pgadmin:
+    container_name: pgadmin_container
+    image: dpage/pgadmin4
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    volumes:
+       - pgadmin:/root/.pgadmin
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      - postgres
+    networks:
+      - iceHorseNet
+
+  pgbackups:
+    image: prodrigestivill/postgres-backup-local
+    restart: unless-stopped
+    volumes:
+        - ./backups:/backups
+    links:
+        - postgres
+    depends_on:
+        - postgres
+    environment:
+        - POSTGRES_HOST=postgres
+        - POSTGRES_DB=iceHorseFair
+        - POSTGRES_USER=${POSTGRES_USER}
+        - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+     #  - POSTGRES_PASSWORD_FILE=/run/secrets/db_password <-- alternative for POSTGRES_PASSWORD (to use with docker secrets)
+      #  - POSTGRES_EXTRA_OPTS=-Z9 --schema=public --blobs
+        - SCHEDULE=@daily
+    #    - SCHEDULE=@every 2m
+        - BACKUP_KEEP_DAYS=7
+        - BACKUP_KEEP_WEEKS=4
+        - BACKUP_KEEP_MONTHS=6
+        - HEALTHCHECK_PORT=8669
+    networks:
+        - iceHorseNet 
+  backend:
+    container_name: backend
+    environment:
+      - NODE_ENV=production
+      - STATIC_UPLOADS_PATH_CONTAINER=${STATIC_UPLOADS_PATH_CONTAINER}
+      - STATIC_BLOGPOSTS_PATH_CONTAINER=${STATIC_BLOGPOSTS_PATH_CONTAINER}
+    build:
+      context: ./backend
+    depends_on:
+      - postgres
+      - redis 
+    restart: unless-stopped
+    # ports:
+    #   # - "3000:3000"
+    #   - "127.0.0.1:9991:9991"
+    networks:
+      - iceHorseNet
+    volumes:
+        - ${STATIC_UPLOADS_PATH_HOST}:${STATIC_UPLOADS_PATH_CONTAINER}
+        - ${STATIC_BLOGPOSTS_PATH_HOST}:${STATIC_BLOGPOSTS_PATH_CONTAINER}
+
+  frontend:
+    container_name: frontend
+    build:
+      context: ./frontend
+    depends_on:
+      - backend
+    restart: unless-stopped
+    # ports:
+    #   - "3100:3100"
+    networks:
+      - iceHorseNet
+
+  prerender:
+    environment:
+        - NODE_ENV=production
+    container_name: prerender_service
+    build:
+      context: ./frontend
+      dockerfile: DockerfileSsr
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - redis
+    # ports:
+    #    - "3001:3001"
+    networks:
+       - iceHorseNet
+
+  server:
+    container_name: server
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - "127.0.0.1:8999:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ${STATIC_UPLOADS_PATH_HOST}:/var/www/
+    networks:
+      - iceHorseNet
+            
+      
+networks:
+  iceHorseNet:
+    driver: bridge
+
+volumes:
+    postgres:
+    pgadmin:

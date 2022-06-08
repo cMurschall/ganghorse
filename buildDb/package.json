@@ -1,0 +1,14 @@
+{
+  "name": "builddb",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "anzip": "^0.2.0",
+    "node-fetch": "^2.6.0",
+    "pg": "^8.3.0",
+    "pg-copy-streams": "^5.1.1"
+  }
+}

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox=" 0 0 100 100">
+    <style>
+    @font-face {
+        font-family: "Sofiat";
+        src: url("https://fonts.googleapis.com/css?family=Sofia");
+    }
+    </style>
+    <text y=".9em" font-size="80">g.h</text>
+</svg>

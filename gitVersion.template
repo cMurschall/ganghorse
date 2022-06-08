@@ -1,0 +1,1 @@
+export const gitVersion = { gitHash : '_git_hash_', gitTag : '_git_tag_' }
